@@ -1,5 +1,9 @@
-# Proyecto IngSoft3 - versión A
-# Ingenieria-de-Software-III
+
+# Proyecto IngSoft3 - versión B
+
+
+
+
 Repositorio creado para la materia Ingenieria de Software III
 ## Instalación
 
