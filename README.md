@@ -102,3 +102,4 @@ base ni de Express:
 6. Sólo se registra un parto de una hembra que tuviera al menos 24 meses a esa fecha.
 
 -
+[![CI](https://github.com/Rous444/Ingenieria-de-Software-III/actions/workflows/ci.yml/badge.svg)](https://github.com/Rous444/Ingenieria-de-Software-III/actions/workflows/ci.yml)
