@@ -100,3 +100,5 @@ base ni de Express:
 4. El peso debe ser positivo y coherente con la categoría del animal.
 5. Transiciones de estado: `activo → vendido` o `activo → muerto`, sin vuelta atrás.
 6. Sólo se registra un parto de una hembra que tuviera al menos 24 meses a esa fecha.
+
+-
