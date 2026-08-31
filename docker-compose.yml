@@ -1,0 +1,36 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: rodeo              # crea la base que espera la cadena de conexión
+    volumes:
+      - db_data:/var/lib/postgresql/data   # los datos SOBREVIVEN al contenedor
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      retries: 10
+
+  backend:
+    build: ./backend
+    environment:
+      # "db" es el NOMBRE DEL SERVICIO: compose arma una red interna con DNS,
+      # así que el backend llega a la base por ese nombre y no por una IP.
+      DATABASE_URL: "postgres://postgres:${DB_PASSWORD}@db:5432/rodeo"
+      PORT: 8080
+    ports:
+      - "8080:8080"                   # para curl/Postman: el browser entra por el 3000
+    depends_on:
+      db:
+        condition: service_healthy    # espera a que la base esté LISTA, no sólo iniciada
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+
+volumes:
+  db_data:
