@@ -30,7 +30,7 @@ Arriba la versión de mi rama, abajo la que ya estaba en `main`, y `<<<<<<<`,
 
 ### 4. Release v1.0.0 publicada
 
-![release](img/release-v1.png)
+![release](img/release-v1.jpeg)
 
 El tag `v1.0.0` marca el commit donde cerré el TP1, y la release le agrega las
 notas de qué incluye esa versión.
