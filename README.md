@@ -1,4 +1,5 @@
 # Libreta del Rodeo
+[![CI](https://github.com/Rous444/Ingenieria-de-Software-III/actions/workflows/ci.yml/badge.svg)](https://github.com/Rous444/Ingenieria-de-Software-III/actions/workflows/ci.yml)
 
 Registro de un rodeo de tambo: alta de animales por caravana, ficha individual
 con pesadas y partos, y control del estado de cada animal. Es la aplicación del
@@ -102,4 +103,4 @@ base ni de Express:
 6. Sólo se registra un parto de una hembra que tuviera al menos 24 meses a esa fecha.
 
 -
-[![CI](https://github.com/Rous444/Ingenieria-de-Software-III/actions/workflows/ci.yml/badge.svg)](https://github.com/Rous444/Ingenieria-de-Software-III/actions/workflows/ci.yml)
+
