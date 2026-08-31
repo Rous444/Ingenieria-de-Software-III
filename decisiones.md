@@ -208,3 +208,96 @@ pesada absurda para la categoría, parto en un macho); la persistencia con el pa
 `docker logout` antes del `pull`, porque que la página diga "Public" no prueba nada.
 Los cinco problemas de arriba salieron justamente de que las cosas no funcionaron a
 la primera.
+
+## TP3 — Planificación y trazabilidad
+
+### Duración del sprint y por qué
+
+**Una semana.** La elegí alineada con el ritmo real de la materia: se dicta un
+práctico por semana y cada uno se cierra con su tag y su release, así que el
+sprint coincide con la unidad de trabajo que ya existe. Un sprint de dos o tres
+semanas me daría un ciclo de feedback más largo que el propio ritmo de entrega —
+me enteraría de que algo no entra recién cuando ya es tarde para renegociarlo.
+
+Y hay una razón de método además de la práctica: lo que se compromete en un sprint
+es el **objetivo**, no la lista de ítems, que es un pronóstico. Con una semana, si
+el pronóstico falla, la corrección llega a tiempo.
+
+### Límite de trabajo en progreso y por qué ese número
+
+**2.** La regla de arranque es *cantidad de personas + 1*, y trabajo solo. El "más
+uno" es la válvula para cuando algo queda esperando —una revisión, una respuesta,
+un build corriendo— y necesito avanzar en otra cosa sin dejar de tener una sola
+tarea realmente en curso. Pasarme de ahí haría que el límite deje de limitar.
+
+El concepto viene de **Kanban** y es la traducción operativa de *empezar menos,
+terminar más*: el trabajo empezado y no terminado no es productividad, es
+**inventario**, y el inventario cuesta — más cambio de contexto, más ramas viejas,
+más conflictos al integrar. La señal de que el número quedó **alto** sería que
+nunca lo alcance; la de que quedó bajo, que quede bloqueado esperando sin poder
+avanzar en nada.
+
+Un matiz que conviene tener claro: GitHub pone el contador en rojo cuando la
+columna se llena, pero **deja pasar**. El límite es un acuerdo de trabajo, no un
+candado de la herramienta.
+
+### Diagnóstico de la historia mal escrita
+
+La historia del ejercicio era: *"Como desarrollador quiero crear la tabla usuarios
+para guardar los datos."*
+
+**Por qué está mal:** el usuario de una historia es **quien recibe el valor**, no
+quien programa. "Crear una tabla" es trabajo técnico — una **tarea**, no una
+historia: nadie *quiere* una tabla. Y el "para" no aporta un beneficio observable,
+sino la misma frase técnica dicha de otra forma; si el beneficio no se puede
+escribir, probablemente la historia no exista. Tampoco es testeable: no hay ningún
+criterio que un tercero pueda verificar sin mirar el esquema de la base.
+
+**Cómo la reescribiría**, en el dominio de mi app: *"Como encargado del tambo
+quiero registrar cada animal con su número de caravana para tener el inventario
+del rodeo actualizado sin depender de planillas de papel."* La creación de la
+tabla pasa a ser una **tarea** colgada de esa historia, que es su lugar.
+
+### Problemas encontrados
+
+- **Los cuerpos multilínea de los issues se truncaron al crearlos con `gh`.** No
+  fue culpa de `gh` sino de `cmd`: no admite texto con saltos de línea entre
+  comillas, así que tomó la primera línea como cuerpo e intentó ejecutar el resto
+  como comandos. La historia quedó sin sus criterios de aceptación y el bug sin el
+  "qué esperaba" ni el "cómo reproducirlo". Los completé editando el cuerpo desde
+  la web. La alternativa correcta por consola habría sido `--body-file`.
+
+- **El Project nace privado y el entregable es la URL.** Si lo hubiera entregado
+  así, quien abriera el link vería un 404 — ni siquiera un "no tenés permiso".
+  Lo pasé a Public en `⋯ → Settings → Visibility` y lo verifiqué abriendo la URL
+  en una ventana de incógnito, que es la única prueba que vale.
+
+- **La jerarquía tuve que armarla con sub-issues, no con task-lists.** Una
+  task-list en el cuerpo del issue se ve parecida, pero no crea la relación
+  padre-hijo navegable: no permite subir de la tarea a su historia y de ahí a la
+  épica, que es justamente el requisito.
+
+- **Perdí esta sección una vez por un `git reset --hard`.** La tenía escrita sin
+  commitear y corrí un `reset --hard origin/main` para sincronizar antes de crear
+  la rama; el reset descarta los cambios no commiteados y se la llevó. El síntoma
+  fue que GitHub no me ofrecía crear el Pull Request: la rama era idéntica a
+  `main` porque no había nada que comparar. Aprendizaje: commitear primero,
+  sincronizar después.
+
+### Declaración de uso de IA
+
+Usé Claude para ordenar el trabajo del práctico, explicarme dónde estaba cada
+opción de la interfaz de Projects, advertirme de las trampas (que el Project nace
+privado, que las task-lists no cumplen el requisito de jerarquía navegable, que
+`Closes` va en la descripción del PR y con el número de la tarea y no de la
+historia) y redactar el borrador de esta sección.
+
+Las decisiones son mías: la duración del sprint, el número del límite de trabajo
+en progreso, y la reescritura de la historia mal escrita en el dominio de mi
+aplicación.
+
+**Cómo lo verifiqué:** abriendo la URL del Project en incógnito para confirmar que
+es pública; comprobando en el propio tablero que la épica muestra su historia como
+sub-issue y la historia sus dos tareas; y navegando la vuelta completa después del
+merge — desde la tarea cerrada al Pull Request que la cerró, de ahí al commit, y
+subiendo a la historia y a la épica.
