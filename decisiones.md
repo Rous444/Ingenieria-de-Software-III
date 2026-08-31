@@ -301,3 +301,131 @@ es pública; comprobando en el propio tablero que la épica muestra su historia 
 sub-issue y la historia sus dos tareas; y navegando la vuelta completa después del
 merge — desde la tarea cerrada al Pull Request que la cerró, de ahí al commit, y
 subiendo a la historia y a la épica.
+
+## TP4 — CI: Pipelines as Code
+
+### Estructura del pipeline: por qué esos jobs y por qué en paralelo
+
+Dos jobs, `build-backend` y `build-frontend`, uno por cada imagen que compone el
+sistema. Están separados porque **son verificaciones independientes**: que el
+backend compile no dice nada sobre el frontend, y viceversa. Al separarlos, cuando
+algo se rompe el propio nombre del check en rojo ya dice dónde mirar — lo vi en la
+demostración del gate, donde `build-frontend` quedó en rojo y `build-backend` en
+verde.
+
+Corren **en paralelo** porque cada job arranca en su propia máquina limpia y no
+dependen uno del otro: el tiempo total es el del más lento, no la suma. Y por eso
+mismo **no comparten filesystem**: si uno necesitara algo que produjo el otro,
+habría que pasarlo como artefacto o declarar `needs:`.
+
+### Por qué el pipeline construye con mi Dockerfile en vez de compilar por su cuenta
+
+Para no tener **dos definiciones de build**. Si el workflow instalara dependencias
+y compilara con `npm` por su lado, tendría una forma de construir en CI y otra en
+el Dockerfile, y tarde o temprano divergen: estaría verificando una compilación
+distinta de la que después se despliega.
+
+Usando `docker/build-push-action` con el `context` de cada carpeta, el pipeline
+construye **exactamente el mismo artefacto** que corre en mi máquina y que va a
+correr en producción. Efecto colateral que se nota leyendo el YAML: no hay una
+sola línea de Node ni de npm. El workflow no sabe qué hay adentro del Dockerfile —
+por eso el mismo archivo le serviría a un compañero con otro stack.
+
+### Qué cachea el pipeline y qué pasa si el cache desaparece
+
+Cachea las **capas de las imágenes**, no dependencias sueltas. Se guardan en el
+almacén de GitHub Actions (`type=gha`), no en el Docker del runner, que nace vacío
+en cada corrida.
+
+Cuáles se reutilizan lo decide el orden del Dockerfile: como en los dos se copia
+primero `package*.json` y se instala, y recién después el código, mientras no
+cambien las dependencias esa capa se reutiliza y sólo se rehace lo posterior. Por
+eso el `build-backend` de la demostración tardó 13 segundos y el `build-frontend`
+36: el segundo tenía que rehacer el `npm run build` porque el código había
+cambiado.
+
+Cada job tiene su **`scope` propio** (`scope=backend` y `scope=frontend`). No es
+opcional y su ausencia no da error: sin scope los dos comparten el mismo estante y
+se pisan — el último en terminar deja su cache y borra el del otro. El síntoma es
+desconcertante porque parece azar: un job muestra `CACHED` y el otro no, y cuál
+cambia de una corrida a la otra.
+
+**Si el cache desaparece, el pipeline funciona igual, sólo que más lento.** La
+plataforma lo desaloja cuando quiere y tiene límite de tamaño, así que no se puede
+depender de él. Si el pipeline *fallara* sin cache, no sería un cache: sería una
+dependencia escondida, y eso es un bug.
+
+También hizo falta `docker/setup-buildx-action`: el constructor de fábrica de
+Docker guarda las capas en el disco de la máquina y no sabe exportarlas a un
+almacén externo. Sin ese paso el build **falla**, con un error que dice que el
+driver `docker` no soporta exportar cache.
+
+### El gate
+
+`main` exige ahora **dos** condiciones para aceptar un merge: que el cambio venga
+por Pull Request (la protección del TP1) y que `build-backend` y `build-frontend`
+estén en verde (required status checks del TP4). La puerta sin verificación no
+alcanza, y la verificación sin puerta tampoco.
+
+Activé además `strict` (*require branches to be up to date*), que exige que la
+rama esté actualizada con `main` antes de mergear: un verde sacado contra un `main`
+viejo no prueba que la mezcla actual funcione.
+
+Las aprobaciones siguen en **0**, igual que en el TP1: el trabajo es individual y
+GitHub nunca permite aprobar el propio Pull Request. Lo que bloquea acá no es una
+aprobación humana, es el pipeline.
+
+Un detalle que aprendí configurándolo: el nombre del check sale del **id del job**,
+no del `name:` del workflow ni del de los steps. Si le pusiera un `name:` al job
+después de cablear el gate, el gate quedaría esperando un check que ya no existe y
+bloquearía todos los PRs.
+
+### La demostración del gate
+
+Rompí el build a propósito agregando `import noExiste from './no-existe.js'` en
+`frontend/src/App.jsx`. Elegí romper el **frontend** y no el backend porque mi
+stack no compila en el sentido clásico: Express no tiene paso de compilación, así
+que romper su código no cambiaría nada — nadie lo ejecuta durante el `docker
+build`. El frontend, en cambio, se empaqueta: Vite resuelve los imports al hacer
+`npm run build` y falla ahí. Si hubiera querido romper el backend, habría tenido
+que agregar un paquete inexistente al `package.json`.
+
+La secuencia quedó registrada en el Pull Request: `build-frontend` en rojo marcado
+como *Required*, el botón de merge deshabilitado, el commit que saca la línea, los
+dos checks en verde, y el merge. Alcanza con que **uno** de los dos se ponga en
+rojo para bloquear.
+
+Dejé además un segundo Pull Request abierto al mismo tiempo, porque el `strict` no
+se puede demostrar con uno solo: al mergear el primero, el segundo mostró el botón
+**Update branch** — su verde había quedado viejo.
+
+### Problemas encontrados
+
+- **El primer intento de gate no encontraba los checks.** El buscador de *require
+  status checks* sólo ofrece checks que corrieron en los últimos 7 días, así que
+  antes de configurarlo hay que dejar correr el workflow al menos una vez. No
+  estaba roto: era el orden.
+
+- **Mergeé el PR del pipeline antes de hacer las dos corridas seguidas** que
+  muestran el cache reutilizando capas dentro del mismo PR. No lo perdí del todo:
+  al correr el workflow sobre `push` a `main`, esa corrida deja el cache disponible
+  para la rama base, y los PRs posteriores lo reutilizan desde su primera corrida.
+  Pero el orden correcto habría sido hacer las dos corridas en el PR antes de
+  mergear.
+
+- **El badge quedó al final del README.** Funcionaba, pero un badge existe para que
+  cualquiera que entre al repositorio vea el estado del build sin buscarlo; al
+  final del archivo no cumple esa función. Lo moví debajo del título.
+
+### Declaración de uso de IA
+
+Usé Claude para redactar el workflow, explicarme qué hace cada clave del YAML
+(sobre todo el mecanismo del cache y por qué el `scope` no es opcional), guiarme en
+la configuración del gate y diagnosticar los errores de arriba.
+
+Ejecuté yo cada paso y verifiqué los resultados contra lo que se veía en pantalla:
+que los dos jobs aparecieran en paralelo en la corrida, que los checks figuraran
+como *Required* en el Pull Request, que el merge quedara efectivamente bloqueado
+con el check en rojo, que se destrabara al arreglarlo, que el segundo PR mostrara
+el *Update branch*, y que el badge lleve al historial de corridas y no a un SVG
+suelto.
