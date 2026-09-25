@@ -66,6 +66,36 @@ describe('registrarPesada', () => {
   });
 });
 
+describe('ficha', () => {
+  it('arma la ficha con las novedades y la ganancia diaria calculada', async () => {
+    const repo = repoFalso({
+      buscarAnimal: vi.fn().mockResolvedValue(vacaActiva),
+      novedadesDe: vi.fn().mockResolvedValue({
+        pesadas: [
+          { fecha: '2026-01-01', kg: 400 },
+          { fecha: '2026-01-11', kg: 410 },
+        ],
+        partos: [],
+      }),
+    });
+
+    const r = await crearServicio(repo).ficha('7', HOY);
+
+    expect(r.status).toBe(200);
+    expect(r.cuerpo).toMatchObject({ categoria: 'vaca', gananciaDiaria: 1 });
+    expect(repo.novedadesDe).toHaveBeenCalledWith('7');
+  });
+
+  it('no busca novedades de un animal que no existe', async () => {
+    const repo = repoFalso();
+
+    const r = await crearServicio(repo).ficha('99', HOY);
+
+    expect(r.status).toBe(404);
+    expect(repo.novedadesDe).not.toHaveBeenCalled();
+  });
+});
+
 describe('cambiarEstado', () => {
   it('vende un animal activo: pide el UPDATE con el estado nuevo', async () => {
     const repo = repoFalso({
