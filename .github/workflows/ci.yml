@@ -30,6 +30,47 @@ jobs:
           cache-from: type=gha,scope=backend
           cache-to: type=gha,mode=max,scope=backend
 
+      # ── TP5: tests con cobertura, en la etapa `test` del mismo Dockerfile ──
+      - name: Construir la etapa de tests del backend
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          target: test          # se detiene en la etapa de tests, no llega a la final
+          load: true            # la baja al Docker local: sin esto el docker run no la encuentra
+          push: false
+          tags: backend-test:ci
+          cache-from: type=gha,scope=backend-test
+          cache-to: type=gha,mode=max,scope=backend-test
+
+      # Si un test falla o la cobertura no llega al umbral, vitest sale con error,
+      # el docker run devuelve ese error y el job se pone en rojo. Como el job es
+      # un required check de main (TP4), el merge queda bloqueado.
+      - name: Correr los tests del backend con cobertura (y umbral)
+        run: |
+          docker run --rm -e COVERAGE_DIR=/salida/reporte \
+            -v "${{ github.workspace }}/backend-coverage:/salida" backend-test:ci
+
+      - name: Resumen de cobertura del backend
+        if: ${{ !cancelled() }}      # también cuando el umbral falló: es la corrida que más importa ver
+        run: |
+          F=backend-coverage/reporte/coverage-summary.json
+          test -f "$F"                  # si no está el archivo, mejor rojo que un resumen vacío
+          node -e "
+            const t = require('./$F').total;
+            if (!t.lines.total) { console.error('midio 0 archivos: revisa el include'); process.exit(1); }
+            const f = (m) => \`| \${m} | \${t[m].covered}/\${t[m].total} | \${t[m].pct}% |\`;
+            console.log('### Cobertura del backend');
+            console.log('| métrica | cubiertas/total | % |'); console.log('|---|---|---|');
+            console.log(f('lines')); console.log(f('branches')); console.log(f('functions'));
+          " >> $GITHUB_STEP_SUMMARY
+
+      - name: Publicar el reporte de cobertura del backend
+        uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: coverage-backend
+          path: backend-coverage
+
   build-frontend:
     runs-on: ubuntu-latest
     steps:
@@ -52,3 +93,44 @@ jobs:
           tags: rodeo-frontend:ci
           cache-from: type=gha,scope=frontend
           cache-to: type=gha,mode=max,scope=frontend
+
+      # ── TP5: tests con cobertura, en la etapa `test` del mismo Dockerfile ──
+      - name: Construir la etapa de tests del frontend
+        uses: docker/build-push-action@v6
+        with:
+          context: ./frontend
+          target: test          # se detiene en la etapa de tests, no llega a la final
+          load: true            # la baja al Docker local: sin esto el docker run no la encuentra
+          push: false
+          tags: frontend-test:ci
+          cache-from: type=gha,scope=frontend-test
+          cache-to: type=gha,mode=max,scope=frontend-test
+
+      # Si un test falla o la cobertura no llega al umbral, vitest sale con error,
+      # el docker run devuelve ese error y el job se pone en rojo. Como el job es
+      # un required check de main (TP4), el merge queda bloqueado.
+      - name: Correr los tests del frontend con cobertura (y umbral)
+        run: |
+          docker run --rm -e COVERAGE_DIR=/salida/reporte \
+            -v "${{ github.workspace }}/frontend-coverage:/salida" frontend-test:ci
+
+      - name: Resumen de cobertura del frontend
+        if: ${{ !cancelled() }}      # también cuando el umbral falló: es la corrida que más importa ver
+        run: |
+          F=frontend-coverage/reporte/coverage-summary.json
+          test -f "$F"                  # si no está el archivo, mejor rojo que un resumen vacío
+          node -e "
+            const t = require('./$F').total;
+            if (!t.lines.total) { console.error('midio 0 archivos: revisa el include'); process.exit(1); }
+            const f = (m) => \`| \${m} | \${t[m].covered}/\${t[m].total} | \${t[m].pct}% |\`;
+            console.log('### Cobertura del frontend');
+            console.log('| métrica | cubiertas/total | % |'); console.log('|---|---|---|');
+            console.log(f('lines')); console.log(f('branches')); console.log(f('functions'));
+          " >> $GITHUB_STEP_SUMMARY
+
+      - name: Publicar el reporte de cobertura del frontend
+        uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: coverage-frontend
+          path: frontend-coverage

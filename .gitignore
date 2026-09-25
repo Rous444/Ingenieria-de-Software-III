@@ -14,3 +14,5 @@ build/
 Thumbs.db
 .vscode/
 .idea/
+# reportes de cobertura (TP5): los genera cada corrida, no se versionan
+coverage/
