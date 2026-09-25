@@ -429,3 +429,275 @@ como *Required* en el Pull Request, que el merge quedara efectivamente bloqueado
 con el check en rojo, que se destrabara al arreglarlo, que el segundo PR mostrara
 el *Update branch*, y que el badge lleve al historial de corridas y no a un SVG
 suelto.
+
+## TP5 · Calidad automatizada: tests, cobertura y el umbral que frena un merge
+
+> Los enlaces marcados con `PEGAR` se completan con las corridas y los Pull
+> Requests reales antes del tag `v5.0.0`.
+
+### Qué lógica testeo y por qué ésa
+
+En la Libreta del Rodeo un bug no rompe la pantalla: **ensucia el registro**, y el
+registro es lo que el productor usa para decidir. Una vaquillona cargada como vaca,
+un parto registrado a una hembra de 20 meses o una pesada de 800 kg en un ternero
+no dan ningún error; quedan guardados y después se toman decisiones sobre datos
+falsos. Por eso la suite se concentra en las reglas que deciden qué entra a la base:
+
+| Regla | Dónde duele el bug |
+|---|---|
+| 1. Categoría por sexo y edad (`categoriaDe`) | Los bordes de 12 y 24 meses: un mes de error cambia la categoría y, con ella, el rango de peso válido |
+| 2. Alta de animal (`validarAnimal`) | Caravana vacía o fecha futura: un animal que no se puede identificar |
+| 3. Pesadas (`validarPesada`) | Un dedo equivocado (800 en vez de 80) arruina la curva de engorde |
+| 4. Partos (`validarParto`) | El borde de 24 meses exactos, y partos de machos |
+| 5 y 6. Estados (`transicionValida`, `admiteNovedades`) | Un animal vendido o muerto que "revive" o sigue recibiendo pesadas |
+| 7. Ganancia diaria (`gananciaDiaria`) | Es EL número del engorde; si da mal, se engorda a ciegas |
+
+Los casos de borde no están de adorno: están puestos para que **invertir una regla
+ponga algo en rojo**. Si alguien cambia el `meses < 24` de `categoriaDe` por
+`meses <= 24`, falla el test de "24 meses justos es vaca"; si corre el
+`kg > rango[1]` a `kg >= rango[1]`, falla el de "250 kg en un ternero se acepta".
+
+### La suite
+
+- **Backend: 35 métodos de test** (`backend/test/`), sobre las 7 reglas y el
+  servicio. Parametrizados con `it.each` (por ejemplo, las 8 combinaciones de
+  sexo y edad de `categoriaDe`), casos de error (caravana vacía, peso cero o
+  negativo, fechas futuras, parto de un macho) y **13 tests con mock** en
+  `servicio.test.js`.
+- **Frontend: 7 métodos de test** (sin DOM), al lado del código: `validacion.test.js`
+  (con un `it.each` de los tres campos obligatorios y los casos de fecha futura e
+  inexistente) y `api.test.js` (con el `fetch` reemplazado por un doble, y un
+  `it.each` de los tres formatos de error del backend).
+
+Cuento **métodos**, no filas: un `it.each` con 8 datos es un test, no ocho.
+
+### El refactor para poder mockear
+
+**Backend.** Antes, `rutas/animales.js` hacía todo junto: consultaba `pool`
+directamente, aplicaba las reglas y armaba la respuesta HTTP. Las reglas puras de
+`reglas.js` ya se podían testear, pero la parte que decide **si se guarda o no**
+(¿el animal existe?, ¿está activo?, ¿pasa la validación?) estaba pegada al SQL:
+para probarla hacía falta PostgreSQL levantado. Lo separé en tres piezas:
+
+- `repositorio.js`: el único archivo con SQL. Pide y guarda filas, sin reglas.
+- `servicio.js`: los casos de uso. Recibe el repositorio **por parámetro**
+  (`crearServicio(repo)`) en vez de importar `pool`.
+- `rutas/animales.js`: pide, delega en el servicio y responde. Es acá donde se le
+  pasa el repositorio real.
+
+En los tests, `repoFalso()` arma un objeto con la misma forma que el repositorio,
+con cada método hecho con `vi.fn()`. El test que mejor muestra la diferencia entre
+stub y mock es **"NO toca la base si el animal está vendido"**: el doble hace de
+stub cuando contesta el animal (`mockResolvedValue`), y de mock en el assert
+`expect(repo.insertarPesada).not.toHaveBeenCalled()`, que no mira lo que devolvió
+el servicio sino **qué le pidió a la base**. Si alguien borra el chequeo de
+`admiteNovedades`, ese test se pone en rojo aunque la respuesta siguiera siendo
+la misma.
+
+**Frontend.** `api.js` llamaba al `fetch` global adentro de `pedir`, sin forma de
+reemplazarlo. Ahora `crearApi(unFetch)` arma el cliente con el fetch que se le
+pase, y la app exporta `api = crearApi(fetch del navegador)`, así que los
+componentes no cambiaron. El test verifica la **interacción**: que la pesada vaya
+por `POST` a `/api/animales/7/pesadas` con el cuerpo en JSON, y que el texto del
+buscador se escape en la URL.
+
+El límite de esto: los dobles prueban **mi** código, no la conexión. Si el backend
+cambia el formato de sus errores, el test del front sigue verde porque el doble
+contesta lo de siempre. Eso lo cubren las pruebas de punta a punta del TP7.
+
+### Herramientas (mi stack no es el de la cátedra)
+
+| Lo que había que lograr | Qué usé (back y front, Node + vitest) |
+|---|---|
+| Dónde viven los tests | Back: `backend/test/` (afuera de `src/`, así la imagen final, que copia sólo `src`, no se los lleva). Front: al lado del código, `*.test.js` |
+| Test parametrizado | `it.each` |
+| Dependencia desde afuera | Parámetro: `crearServicio(repo)` y `crearApi(unFetch)` |
+| Fabricar el doble | `vi.fn()` con `mockResolvedValue` / `mockRejectedValue` |
+| Medir la cobertura | `vitest run --coverage` con `@vitest/coverage-v8` |
+| Umbral que rompe el build | `coverage.thresholds` en `vitest.config.js` y `vite.config.js` |
+| Qué entra en la cuenta | `coverage.include` / `coverage.exclude` |
+| Reporte legible | reporter `html` (artefacto) y `json-summary` (lo lee el paso del Summary) |
+| Que las herramientas entren a la etapa de tests | `npm ci` **sin** `--omit=dev` en la etapa `build` |
+
+Usé **vitest también en el backend** (en vez del `node --test` que tenía el
+`package.json`) para tener una sola herramienta, una sola forma de declarar el
+umbral y el mismo reporte de los dos lados. Versión **3.2.7** en los dos: vitest 4
+exige Vite 6 y mi frontend está en Vite 5.
+
+El pipeline sigue sin saber cómo se testea mi app: cada Dockerfile tiene una etapa
+`test` en el medio (`FROM build AS test` con `ENTRYPOINT ["npm","run","test:ci"]`),
+el job la construye con `target: test` y `load: true`, y la corre con `docker run`
+montando una carpeta para sacar el reporte. `test:ci` es el mismo comando que uso
+en mi máquina: una receta, no dos.
+
+### Qué dejé afuera de la cuenta de cobertura
+
+**Backend** (`vitest.config.js`): entra `src/**/*.js` **menos** estos cuatro:
+
+- `src/index.js`: el arranque (crea Express, monta rutas, escucha el puerto). Si
+  está mal, la app no levanta y me entero en el acto.
+- `src/db.js`: la conexión y el `CREATE TABLE`. Infraestructura, sin reglas.
+- `src/repositorio.js`: SQL puro. Testearlo con un doble sería testear que
+  llamo a `pool.query`; lo que importa (que el SQL sea correcto contra la base
+  real) se verifica de punta a punta en el TP7.
+- `src/rutas/**`: pegamento HTTP; después del refactor no queda ninguna decisión
+  ahí.
+
+Es un `exclude` y no una lista de archivos incluidos a propósito: un archivo nuevo
+en `src/` **entra solo** a la medición. Y no excluí nada con lógica: antes de
+sacar las rutas de la cuenta, saqué sus decisiones al servicio. Si hubiera
+excluido `rutas/` con la lógica adentro, el número habría medido sólo `reglas.js`
+y habría dado altísimo.
+
+**Frontend** (`vite.config.js`): entran los `.js` de `src/` (hoy `validacion.js` y
+`api.js`). Quedan afuera los componentes `.jsx` y `main.jsx`: son pantalla y
+cableado de React, y la interfaz completa se verifica de punta a punta en el TP7.
+
+### El umbral: 90 % de líneas y 85 % de ramas, en los dos lados
+
+Lo medí antes de elegirlo. Con la suite completa, hoy da:
+
+| | Líneas | Ramas |
+|---|---|---|
+| Backend | 98,78 % | **95,74 %** |
+| Frontend | 100 % | **90,9 %** |
+
+Puse **90 de líneas** porque deja margen para un refactor chico (algunas líneas
+que se mueven) pero **no** para un archivo nuevo sin tests: lo comprobé en los dos
+Pull Requests de abajo, donde una sola función sin tests alcanzó para frenar. Y
+puse umbral **también en ramas (85)** porque es la métrica honesta: una línea con
+un `if` cuenta como cubierta aunque sólo se haya recorrido uno de sus caminos. Las
+ramas quedan en 85 y no en 90 porque el frontend hoy mide 90,9: con 90 cualquier
+rama nueva sin probar lo frenaría, y no quiero un gate que se apague el día que
+molesta.
+
+Cada lado evalúa su umbral por separado (son dos proyectos de vitest, dos jobs): un
+backend muy cubierto no compensa un frontend flojo.
+
+**Para subirlo** a 95 de ramas me faltaría: el camino de la pesada con fecha
+inválida (`reglas.js`, línea 86), la respuesta `204` sin cuerpo del cliente
+(`api.js`, línea 18), la caravana `null` del formulario (`validacion.js`, línea 12)
+y el `listar` del servicio, que hoy no tiene test.
+
+**Si mañana lo subo diez puntos** (100 de líneas), el gate frenaría cualquier
+cambio que no esté cubierto al 100 %, incluidos los caminos que no vale la pena
+probar. La reacción previsible es escribir tests sin assert para llegar al número
+(Goodhart), y el número dejaría de decir algo.
+
+### Por qué cobertura alta no garantiza calidad (con mi ejemplo)
+
+Este test deja `gananciaDiaria` con todas sus líneas cubiertas y no verifica nada:
+
+```js
+it('cubre la ganancia diaria', () => {
+  gananciaDiaria([{ fecha: '2026-01-01', kg: 200 }, { fecha: '2026-03-01', kg: 250 }]);
+});
+```
+
+Si alguien invierte la cuenta (`primera.kg - ultima.kg`), la cobertura sigue
+igual y el test sigue en verde. El test real (`toBe(0.847)`) se pone en rojo. La
+cobertura mide qué se **ejecutó**, no qué se **comprobó**; lo que lo comprueba es
+el assert, y eso ningún porcentaje lo ve. Cobertura baja sí es una señal
+confiable (hay código que nadie mira); cobertura alta, no.
+
+### El ejercicio del camino sin cubrir
+
+1. **Qué línea**: `reglas.js`, `transicionValida`, en
+   `return (TRANSICIONES[actual] ?? []).includes(nuevo);`. En el primer reporte
+   aparecía como rama sin cubrir, sin ningún `if` a la vista: la abre el `??`. Todos mis tests usaban estados actuales que existen, así
+   que el lado derecho del `??` nunca se recorría.
+2. **Qué entrada la recorre**: un animal cuyo estado **actual** no está en la tabla
+   de transiciones, por ejemplo `transicionValida('perdido', 'vendido')`. Puede
+   pasar con un dato corrupto en la base (la columna `estado` es `TEXT` sin
+   restricción).
+3. **Qué decidí**: **lo agregué**, como una fila más del `it.each`
+   (`['perdido', 'vendido', false]`). No es un test por el número: sin el `??`,
+   ese dato corrupto tiraría un `TypeError` (`undefined.includes`) en vez de
+   contestar un 409 con el motivo.
+   El test protege esa decisión.
+
+La que sigue sin cubrir es la de la línea 86 (una pesada con fecha inválida). Es
+alcanzable llamando a la API directo, y es el primer test que agregaría para subir
+el umbral de ramas.
+
+### El Pull Request bloqueado
+
+**La suite y el umbral entraron en el Pull Request #28:**
+https://github.com/Rous444/Ingenieria-de-Software-III/pull/28. Los dos checks en
+verde, con el Summary de cobertura y los artefactos `coverage-backend` y
+`coverage-frontend`:
+https://github.com/Rous444/Ingenieria-de-Software-III/actions/runs/36166686634
+
+**Pull Request 1 de la demostración, la secuencia completa (#29):**
+https://github.com/Rous444/Ingenieria-de-Software-III/pull/29
+
+1. El primer commit agrega la **regla 7, la ganancia diaria**, sin tests. Compila,
+   el build de las imágenes pasa y los 47 tests existentes pasan todos… y
+   `build-backend` queda en **rojo**:
+   https://github.com/Rous444/Ingenieria-de-Software-III/actions/runs/36604103224
+   El log del paso *Correr los tests del backend* dice:
+   `ERROR: Coverage for lines (89.02%) does not meet global threshold (90%)`.
+   Frenó **por líneas**. Las ramas no se movieron (94,93 %): en vitest 3 una
+   función que ningún test llama no suma ramas, sólo líneas sin cubrir. Por eso
+   tengo umbral en las dos métricas.
+2. Escribí los tests que faltaban, uno por camino de la función: la ganancia
+   normal con pesadas desordenadas, la pérdida de peso, menos de dos pesadas,
+   pesadas inválidas y dos pesadas el mismo día. Más dos del servicio con mock: la
+   ficha que expone el número y el 404 que no consulta novedades. Volvió a
+   **98,78 % / 95,74 %**, verde
+   (https://github.com/Rous444/Ingenieria-de-Software-III/actions/runs/36604354591),
+   y merge.
+
+**Pull Request 2, el freno vigente (queda abierto hasta la defensa):** PEGAR `…/pull/<m>`
+
+Agrega `edadLegible` en `frontend/src/formato.js` (la edad como la dice un
+productor: "1 año y 3 meses") sin tests. Queda en rojo `build-frontend`:
+`ERROR: Coverage for lines (81.7%) does not meet global threshold (90%)`. Compila
+y los 11 tests del front pasan. Elegí el frontend a propósito para que cada Pull
+Request muestre el freno de un lado distinto.
+
+**Por qué este freno es distinto del del TP4.** El del TP4 frenaba cuando el código
+**no se podía construir**: la máquina diciendo "esto no anda". Éste frena código que
+anda, con todos los tests en verde, por un criterio que elegí yo. Y lo que deja
+pasar igual: un test sin assert que sume cobertura, un requisito mal entendido (el
+test congela lo que yo entendí, no lo que el productor quería), y los errores de
+conexión entre front y back, que los dobles no ven.
+
+Los checks que frenan son los mismos `build-backend` y `build-frontend` del TP4: la
+cobertura corre **adentro** de esos jobs, así que no hubo que tocar la protección de
+`main`. Los tres guardianes: Pull Request obligatorio (TP1), build en verde (TP4),
+tests con su umbral (TP5).
+
+### Problemas encontrados
+
+- **El `--omit=dev` del Dockerfile del backend.** La etapa `build` del TP2 instalaba
+  sólo dependencias de producción, así que la etapa de tests no iba a encontrar
+  vitest. Lo saqué de `build`, y la imagen final ahora instala las suyas aparte con
+  `npm ci --omit=dev` y copia sólo `src/`: no se lleva ni vitest ni la carpeta
+  `test/`.
+- **Tests que dependían de la zona horaria.** JavaScript lee una fecha sin hora
+  (`'2025-09-25'`) como medianoche UTC; en una máquina con hora argentina eso es
+  el día anterior a las 21, y el borde de "24 meses justos" se corría un día.
+  Corriendo la suite con `TZ=America/Argentina/Buenos_Aires` y sin el ajuste,
+  fallan 2 tests de `categoriaDe`; en el contenedor (UTC) pasan. Fijé
+  `TZ=UTC` en la configuración de vitest de los dos lados, que es la zona en la
+  que corre el contenedor de producción, y todas las reglas reciben `hoy` por
+  parámetro para no depender del reloj.
+- **vitest 4 no instala con Vite 5.** Fijé la línea 3 (`3.2.7`) y el
+  `@vitest/coverage-v8` de la misma versión exacta.
+- **`${COVERAGE_DIR:-coverage}` en Windows.** Esa expansión es de `sh`; en mi
+  máquina `npm run test:ci` la ignora. Localmente corro `npm test -- --run
+  --coverage`; el script `test:ci` es el del contenedor, que es Linux.
+
+### Declaración de uso de IA
+
+Usé Claude para proponer el refactor del servicio y del cliente de la API, escribir
+los tests, armar las etapas de los Dockerfiles y los pasos del `ci.yml`, y
+redactar esta sección.
+
+Lo verifiqué así: corrí las dos suites con cobertura antes de subir nada, y
+comprobé que el umbral **frena de verdad** (el mismo `npm run test:ci` devolvió
+error con la ganancia diaria sin tests y volvió a pasar con sus tests). Para cada
+test puedo decir qué verifica el assert y qué regla se rompería si se invierte; lo
+que **no** cubren está escrito arriba (el `listar`, la pesada con fecha inválida,
+el 204 del cliente, y la conexión real front/back, que es del TP7).
