@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from './api.js';
+import { edadLegible } from './formato.js';
 
 const hoy = () => new Date().toISOString().slice(0, 10);
 
@@ -76,6 +77,7 @@ export default function Ficha({ id, alVolver, alCambiar }) {
           <div className="fact"><div className="k">Categoría</div><div className="v">{animal.categoria}</div></div>
           <div className="fact"><div className="k">Sexo</div><div className="v">{animal.sexo}</div></div>
           <div className="fact"><div className="k">Nacimiento</div><div className="v">{String(animal.nacimiento).slice(0, 10)}</div></div>
+          <div className="fact"><div className="k">Edad</div><div className="v">{edadLegible(animal.nacimiento)}</div></div>
           <div className="fact"><div className="k">Raza</div><div className="v">{animal.raza || '—'}</div></div>
           <div className="fact"><div className="k">Lote</div><div className="v">{animal.lote || '—'}</div></div>
           <div className="fact"><div className="k">Estado</div><div className="v">{animal.estado}</div></div>
