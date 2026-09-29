@@ -432,9 +432,6 @@ suelto.
 
 ## TP5 · Calidad automatizada: tests, cobertura y el umbral que frena un merge
 
-> Los enlaces marcados con `PEGAR` se completan con las corridas y los Pull
-> Requests reales antes del tag `v5.0.0`.
-
 ### Qué lógica testeo y por qué ésa
 
 En la Libreta del Rodeo un bug no rompe la pantalla: **ensucia el registro**, y el
@@ -648,7 +645,9 @@ https://github.com/Rous444/Ingenieria-de-Software-III/pull/29
    (https://github.com/Rous444/Ingenieria-de-Software-III/actions/runs/36604354591),
    y merge.
 
-**Pull Request 2, el freno vigente (queda abierto hasta la defensa):** PEGAR `…/pull/<m>`
+**Pull Request 2, el freno vigente (#30, queda abierto hasta la defensa):**
+https://github.com/Rous444/Ingenieria-de-Software-III/pull/30
+(corrida en rojo: https://github.com/Rous444/Ingenieria-de-Software-III/actions/runs/36605444779)
 
 Agrega `edadLegible` en `frontend/src/formato.js` (la edad como la dice un
 productor: "1 año y 3 meses") sin tests. Queda en rojo `build-frontend`:
