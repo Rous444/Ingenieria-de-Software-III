@@ -7,12 +7,19 @@ app.use(express.json());
 
 // Endpoint de salud: es lo que mira el healthcheck del compose y lo primero que
 // se consulta cuando algo "no anda" — si esto contesta, la API está viva.
+//
+// TP6: además dice QUÉ COMMIT está corriendo. Render define RENDER_GIT_COMMIT en
+// cada deploy con el commit que construyó; el smoke test del pipeline lo compara
+// con el commit que acaba de verificar, y así no da verde contra la versión
+// vieja mientras Render todavía está construyendo la nueva.
+const VERSION = process.env.RENDER_GIT_COMMIT || process.env.GIT_SHA || 'desconocida';
+
 app.get('/health', async (_req, res) => {
   try {
     await pool.query('SELECT 1');
-    res.json({ status: 'ok', base: 'ok' });
+    res.json({ status: 'ok', base: 'ok', version: VERSION });
   } catch {
-    res.status(503).json({ status: 'degradado', base: 'sin conexión' });
+    res.status(503).json({ status: 'degradado', base: 'sin conexión', version: VERSION });
   }
 });
 

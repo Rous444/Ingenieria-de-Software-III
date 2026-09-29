@@ -14,6 +14,13 @@ ENTRYPOINT ["npm", "run", "test:ci"]
 
 # ---- Etapa 3: nginx sirve los estáticos (queda ÚLTIMA: es la imagen que se despliega) ----
 FROM nginx:alpine
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+# TP6: la configuración va como PLANTILLA en templates/ (no en conf.d/, donde nginx
+# la leería tal cual, con los ${...} sin reemplazar, y no arrancaría).
+COPY default.conf.template /etc/nginx/templates/default.conf.template
 COPY --from=build /app/dist /usr/share/nginx/html
+# Valores por defecto = los de compose (el nombre del servicio y el DNS interno de
+# Docker): el docker compose up del TP2 sigue andando sin tocarlo. En Render cada
+# servicio los pisa con SUS variables de entorno.
+ENV BACKEND_URL=http://backend:8080 \
+    DNS_RESOLVER=127.0.0.11
 EXPOSE 80
