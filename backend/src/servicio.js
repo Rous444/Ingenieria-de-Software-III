@@ -1,5 +1,6 @@
 import {
   categoriaDe,
+  gananciaDiaria,
   validarAnimal,
   validarPesada,
   validarParto,
@@ -56,7 +57,14 @@ export function crearServicio(repo) {
       const animal = await repo.buscarAnimal(id);
       if (!animal) return noExiste;
       const novedades = await repo.novedadesDe(id);
-      return { status: 200, cuerpo: { ...conCategoria(animal, hoy), ...novedades } };
+      return {
+        status: 200,
+        cuerpo: {
+          ...conCategoria(animal, hoy),
+          ...novedades,
+          gananciaDiaria: gananciaDiaria(novedades.pesadas),
+        },
+      };
     },
 
     async alta(datos, hoy = new Date()) {

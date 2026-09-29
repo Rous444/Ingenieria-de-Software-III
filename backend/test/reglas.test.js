@@ -7,6 +7,7 @@ import {
   validarParto,
   transicionValida,
   admiteNovedades,
+  gananciaDiaria,
 } from '../src/reglas.js';
 
 // Todas las reglas reciben `hoy` por parámetro: los tests fijan la fecha y no
@@ -17,7 +18,7 @@ const HOY = new Date('2026-09-25T12:00:00');
 // ── Regla 1: la categoría se calcula por sexo y edad ─────────────────────────
 describe('categoriaDe', () => {
   it.each([
-    // sexo,     nacimiento,    esperado      — por qué ese dato
+    // sexo,     nacimiento,    esperado      (por qué ese dato)
     ['hembra', '2026-03-10', 'ternera'], //    6 meses
     ['macho', '2026-03-10', 'ternero'], //     6 meses
     ['hembra', '2025-09-25', 'vaquillona'], // 12 meses justos: el borde de ternera
@@ -180,5 +181,50 @@ describe('admiteNovedades', () => {
     ['muerto', false],
   ])('un animal %s admite novedades: %s', (estado, esperado) => {
     expect(admiteNovedades({ estado })).toBe(esperado);
+  });
+});
+
+// ── Regla 7: ganancia diaria de peso (ADPV) ─────────────────────────────────
+// Un test por cada camino que declara la función.
+describe('gananciaDiaria', () => {
+  it('calcula los kilos por día entre la primera y la última pesada, aunque vengan desordenadas', () => {
+    const pesadas = [
+      { fecha: '2026-03-01', kg: 250 }, // la última (59 días después)
+      { fecha: '2026-01-01', kg: 200 }, // la primera
+      { fecha: '2026-02-01', kg: 230 }, // la del medio no cambia el resultado
+    ];
+
+    // 50 kg en 59 días (enero 31 + febrero 28) = 0,847 kg/día
+    expect(gananciaDiaria(pesadas)).toBe(0.847);
+  });
+
+  it('da negativo si el animal perdió peso (es la señal de alarma)', () => {
+    expect(gananciaDiaria([
+      { fecha: '2026-01-01', kg: 400 },
+      { fecha: '2026-01-11', kg: 390 },
+    ])).toBe(-1);
+  });
+
+  it.each([
+    ['sin pesadas', []],
+    ['una sola pesada', [{ fecha: '2026-01-01', kg: 200 }]],
+    ['algo que no es una lista', undefined],
+  ])('no calcula nada %s', (_caso, pesadas) => {
+    expect(gananciaDiaria(pesadas)).toBeNull();
+  });
+
+  it('descarta las pesadas con fecha o kilos inválidos antes de contar', () => {
+    expect(gananciaDiaria([
+      { fecha: 'x', kg: 200 },
+      { fecha: '2026-01-10', kg: 'mucho' },
+      { fecha: '2026-01-20', kg: 210 },
+    ])).toBeNull();
+  });
+
+  it('no inventa un ritmo con dos pesadas del mismo día', () => {
+    expect(gananciaDiaria([
+      { fecha: '2026-01-01', kg: 200 },
+      { fecha: '2026-01-01', kg: 205 },
+    ])).toBeNull();
   });
 });

@@ -138,3 +138,24 @@ export function transicionValida(actual, nuevo) {
 export function admiteNovedades(animal) {
   return animal.estado === 'activo';
 }
+
+// REGLA 7 — Ganancia diaria de peso (ADPV, "aumento diario de peso vivo"): los
+// kilos que ganó el animal por día entre su primera y su última pesada. Es EL
+// número del engorde: dice si el animal está rindiendo o si hay que revisarlo.
+export function gananciaDiaria(pesadas) {
+  if (!Array.isArray(pesadas) || pesadas.length < 2) return null;
+
+  const validas = pesadas
+    .map((p) => ({ fecha: aFecha(p.fecha), kg: Number(p.kg) }))
+    .filter((p) => p.fecha && Number.isFinite(p.kg))
+    .sort((a, b) => a.fecha - b.fecha);
+  if (validas.length < 2) return null;
+
+  const primera = validas[0];
+  const ultima = validas[validas.length - 1];
+  const dias = (ultima.fecha - primera.fecha) / 86400000;
+  if (dias <= 0) return null; // dos pesadas el mismo día no dicen nada del ritmo
+
+  const kgPorDia = (ultima.kg - primera.kg) / dias;
+  return Math.round(kgPorDia * 1000) / 1000;
+}

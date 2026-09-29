@@ -80,6 +80,7 @@ export default function Ficha({ id, alVolver, alCambiar }) {
           <div className="fact"><div className="k">Lote</div><div className="v">{animal.lote || '—'}</div></div>
           <div className="fact"><div className="k">Estado</div><div className="v">{animal.estado}</div></div>
           <div className="fact"><div className="k">Último peso</div><div className="v">{ultima ? `${ultima.kg} kg` : '—'}</div></div>
+          <div className="fact"><div className="k">Ganancia diaria</div><div className="v">{animal.gananciaDiaria != null ? `${animal.gananciaDiaria} kg/día` : '—'}</div></div>
         </div>
       </div>
 
