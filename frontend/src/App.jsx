@@ -36,6 +36,7 @@ export default function App() {
           <div className="logo">
             <span className="mark">🐄</span>
             Libreta del Rodeo
+            <span className="lema">el registro de tu tambo</span>
           </div>
           <span className="sp" />
           <span className="salud">
