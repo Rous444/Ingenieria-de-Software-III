@@ -1,0 +1,35 @@
+# TP6: esto era nginx.conf. Ahora es una PLANTILLA: la imagen oficial de nginx,
+# al arrancar, procesa /etc/nginx/templates/*.template, reemplaza ${VARIABLE} por
+# el valor que tenga en el entorno y deja el resultado en conf.d/.
+#
+# Así la dirección del backend NO queda escrita adentro de la imagen: la MISMA
+# imagen sirve en compose (backend:8080), en QA y en PROD, y cada una habla con
+# su propia api. Los valores por defecto (los de compose) están en el Dockerfile.
+server {
+    listen 80;
+
+    # La SPA: estáticos, con fallback a index.html para las rutas del router.
+    location / {
+        root /usr/share/nginx/html;
+        index index.html;
+        try_files $uri $uri/ /index.html;
+    }
+
+    # Todo lo que llegue a /api se reenvía al backend de ESTE entorno. Para el
+    # browser todo sale del mismo origen, así que no hay CORS.
+    #
+    # El destino va en una VARIABLE y no directo en el proxy_pass: con el nombre
+    # directo nginx lo resuelve al arrancar y, si el backend todavía no existe,
+    # se niega a levantar ("host not found in upstream"). Con variable, resuelve
+    # en cada pedido usando este resolver: el DNS de Docker en compose
+    # (127.0.0.11) o uno público en la nube.
+    resolver ${DNS_RESOLVER} valid=10s ipv6=off;
+    set $backend_api ${BACKEND_URL};
+
+    location /api/ {
+        proxy_pass $backend_api;    # SIN barra final: con barra, nginx reescribe
+                                    # el prefijo y la API devuelve 404 en todo.
+        proxy_ssl_server_name on;   # la api de Render es https: sin esto el TLS
+                                    # no sabe a qué host va (SNI)
+    }
+}
