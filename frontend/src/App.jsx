@@ -52,7 +52,7 @@ export default function App() {
         ) : (
           <>
             <div className="tiles">
-              <div className="tile"><div className="k">En el rodeo</div><div className="v">{activos.length}</div></div>
+              <div className="tile"><div className="k">Animales activos</div><div className="v">{activos.length}</div></div>
               <div className="tile"><div className="k">Hembras activas</div><div className="v">{hembras.length}</div></div>
               <div className="tile"><div className="k">Registrados</div><div className="v">{animales.length}</div></div>
             </div>
