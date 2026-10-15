@@ -32,16 +32,25 @@ for i in $(seq 1 "$INTENTOS"); do
     #    la vieja. Si la api no informa versión, se avisa y no se compara.
     if [ "$version" != "desconocida" ] && [ "$version" != "$COMMIT" ]; then
       echo "[$i/$INTENTOS] la api contesta, pero todavía corre ${version:0:7}"
-    elif curl -fsS --max-time 10 "$URL_API/api/animales" > /dev/null \
-      && curl -fsS --max-time 10 "$URL_FRONT/" > /dev/null \
-      && curl -fsS --max-time 10 "$URL_FRONT/api/animales" > /dev/null; then
-      # 3) La api lista datos (toca las tablas, no sólo la conexión), el front
-      #    sirve la página, y el front llega a SU api a través de nginx.
-      [ "$version" = "desconocida" ] && echo "⚠️  la api no informa qué commit corre: no se pudo comparar"
-      echo "✅ $ENTORNO responde (api + base + front + front→api) con el commit ${version:0:7}"
-      exit 0
     else
-      echo "[$i/$INTENTOS] la api corre el commit correcto, pero algo más no contesta todavía"
+      # 3) Lo demás, de a uno, para que el log diga CUÁL falla: la api lista
+      #    datos (toca las tablas, no sólo la conexión), el front sirve la
+      #    página, y el front llega a SU api a través de nginx.
+      falla=""
+      curl -fsS --max-time 10 -o /dev/null "$URL_API/api/animales"   || falla="la api no lista animales ($URL_API/api/animales)"
+      [ -z "$falla" ] && { curl -fsS --max-time 10 -o /dev/null "$URL_FRONT/" || falla="el front no sirve la página ($URL_FRONT/)"; }
+      [ -z "$falla" ] && { curl -fsS --max-time 10 -o /dev/null "$URL_FRONT/api/animales" || falla="el front no llega a su api a través de nginx ($URL_FRONT/api/animales)"; }
+
+      if [ -z "$falla" ]; then
+        [ "$version" = "desconocida" ] && echo "⚠️  la api no informa qué commit corre: no se pudo comparar"
+        echo "✅ $ENTORNO responde (api + base + front + front→api) con el commit ${version:0:7}"
+        exit 0
+      fi
+      if [ "$version" = "desconocida" ]; then
+        echo "[$i/$INTENTOS] (la api no informa versión) $falla"
+      else
+        echo "[$i/$INTENTOS] la api corre ${version:0:7}, pero $falla"
+      fi
     fi
   else
     echo "[$i/$INTENTOS] la api no contesta (build en curso o cold start)"
