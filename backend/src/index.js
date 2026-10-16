@@ -8,11 +8,14 @@ app.use(express.json());
 // Endpoint de salud: es lo que mira el healthcheck del compose y lo primero que
 // se consulta cuando algo "no anda" — si esto contesta, la API está viva.
 //
-// TP6: además dice QUÉ COMMIT está corriendo. Render define RENDER_GIT_COMMIT en
-// cada deploy con el commit que construyó; el smoke test del pipeline lo compara
-// con el commit que acaba de verificar, y así no da verde contra la versión
-// vieja mientras Render todavía está construyendo la nueva.
-const VERSION = process.env.RENDER_GIT_COMMIT || process.env.GIT_SHA || 'desconocida';
+// TP6: además dice QUÉ COMMIT está corriendo, y el smoke test del pipeline lo
+// compara con el commit que acaba de verificar.
+// TP7: el dato sale de la IMAGEN. GIT_SHA viene horneado en el Dockerfile (el
+// pipeline lo pasa como build-arg), así que /health dice de qué commit es la
+// imagen que el entorno está ejecutando. RENDER_GIT_COMMIT era el del TP6, cuando
+// Render construía desde el repo; un servicio "Existing Image" no tiene repo, y
+// queda sólo como respaldo.
+const VERSION = process.env.GIT_SHA || process.env.RENDER_GIT_COMMIT || 'desconocida';
 
 app.get('/health', async (_req, res) => {
   try {
