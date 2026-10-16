@@ -17,6 +17,7 @@ function repoFalso(sobrescribir = {}) {
     actualizarEstado: vi.fn(),
     insertarPesada: vi.fn(),
     insertarParto: vi.fn(),
+    borrarAnimal: vi.fn().mockResolvedValue(false),
     ...sobrescribir,
   };
 }
@@ -197,5 +198,22 @@ describe('alta', () => {
 
     expect(r).toEqual({ status: 400, cuerpo: { errores: ['La caravana es obligatoria'] } });
     expect(repo.insertarAnimal).not.toHaveBeenCalled();
+  });
+});
+
+describe('borrar', () => {
+  it('borra el animal que existe y contesta 204, sin cuerpo', async () => {
+    const repo = repoFalso({ borrarAnimal: vi.fn().mockResolvedValue(true) });
+
+    const r = await crearServicio(repo).borrar('7');
+
+    expect(r).toEqual({ status: 204, cuerpo: null });
+    expect(repo.borrarAnimal).toHaveBeenCalledWith('7');
+  });
+
+  it('contesta 404 si no había ningún animal con ese id', async () => {
+    const r = await crearServicio(repoFalso()).borrar('99');
+
+    expect(r).toEqual({ status: 404, cuerpo: { error: 'No existe ese animal' } });
   });
 });

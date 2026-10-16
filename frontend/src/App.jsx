@@ -57,7 +57,7 @@ export default function App() {
               <div className="tile"><div className="k">Registrados</div><div className="v">{animales.length}</div></div>
             </div>
 
-            {error && <div className="aviso error">{error}</div>}
+            {error && <div className="aviso error" role="alert">{error}</div>}
 
             <FormAnimal alCrear={() => cargar()} />
 
