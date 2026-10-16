@@ -31,6 +31,12 @@ provider "render" {} # lee RENDER_API_KEY y RENDER_OWNER_ID
 resource "neon_project" "preprod" {
   name = "rodeo-preprod"
 
+  # Región FIJADA. Sin esta línea Neon elige la suya en cada creación: en el
+  # primer apply la base nació en us-east-1 y, después de un destroy, en
+  # us-east-2. Las URLs eran las mismas, pero el entorno no volvía idéntico.
+  # Oregon, la misma región que los servicios de Render (var.region).
+  region_id = "aws-us-west-2"
+
   # Sin esto el primer apply falla: el provider pide un día de historial y el
   # plan gratuito permite seis horas.
   history_retention_seconds = 21600
