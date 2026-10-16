@@ -20,3 +20,10 @@ coverage/
 playwright-report/
 test-results/
 resultados-playwright.json
+# Terraform (TP8): el estado tiene contraseñas en texto plano y vive SÓLO en mi máquina.
+# El .terraform.lock.hcl NO está acá: ése sí se commitea (fija versión y hash de cada provider).
+*.tfstate
+*.tfstate.*
+.terraform/
+*.tfvars
+crash.log
