@@ -37,7 +37,9 @@ export default function FormAnimal({ alCrear }) {
     <form className="panel" onSubmit={enviar}>
       <h3>Dar de alta un animal</h3>
 
-      {errorApi && <div className="aviso error">{errorApi}</div>}
+      {/* role="alert": el lector de pantalla lo anuncia apenas aparece, y es como
+          lo encuentra la e2e (getByRole('alert')), igual que una persona. */}
+      {errorApi && <div className="aviso error" role="alert">{errorApi}</div>}
 
       <div className="f2">
         <div className="f">

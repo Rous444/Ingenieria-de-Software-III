@@ -25,6 +25,16 @@ describe('cliente de la API', () => {
     expect(JSON.parse(opciones.body)).toEqual({ fecha: '2026-09-01', kg: 450 });
   });
 
+  it('borra con DELETE a la ruta del animal, y un 204 sin cuerpo no es un error', async () => {
+    const fetchFalso = vi.fn().mockResolvedValue({ ok: true, status: 204, json: () => Promise.reject() });
+
+    await expect(crearApi(fetchFalso).borrarAnimal(7)).resolves.toBeNull();
+
+    const [url, opciones] = fetchFalso.mock.calls[0];
+    expect(url).toBe('/api/animales/7');
+    expect(opciones.method).toBe('DELETE');
+  });
+
   it('escapa lo que el usuario escribe en el buscador', async () => {
     const fetchFalso = vi.fn().mockResolvedValue(respuesta(200, []));
 

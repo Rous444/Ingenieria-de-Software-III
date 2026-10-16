@@ -93,6 +93,14 @@ export function crearServicio(repo) {
       }
     },
 
+    // TP7: borrar es para el animal cargado POR ERROR (una caravana mal tipeada).
+    // El que se vende o se muere no se borra: cambia de estado y su historia queda.
+    // También es lo que permite que las pruebas contra QA limpien lo que crean.
+    async borrar(id) {
+      const borrado = await repo.borrarAnimal(id);
+      return borrado ? { status: 204, cuerpo: null } : noExiste;
+    },
+
     async cambiarEstado(id, nuevo, hoy = new Date()) {
       const animal = await repo.buscarAnimal(id);
       if (!animal) return noExiste;

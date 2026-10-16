@@ -32,10 +32,24 @@ export default function Ficha({ id, alVolver, alCambiar }) {
     }
   }
 
-  if (error && !animal) return <div className="aviso error">{error}</div>;
+  if (error && !animal) return <div className="aviso error" role="alert">{error}</div>;
   if (!animal) return <p className="vacio">Cargando…</p>;
 
   const activo = animal.estado === 'activo';
+
+  // TP7: borrar es para el animal cargado POR ERROR. El que se vende o se muere
+  // no se borra: se marca, y su historia queda. Por eso pide confirmación.
+  async function borrar() {
+    if (!window.confirm(`¿Borrar la caravana ${animal.caravana}? Se pierden sus pesadas y partos.`)) return;
+    setError(null);
+    try {
+      await api.borrarAnimal(animal.id);
+      alCambiar?.();
+      alVolver();
+    } catch (err) {
+      setError(err.message);
+    }
+  }
   const ultima = animal.pesadas.at(-1);
 
   return (
@@ -44,7 +58,7 @@ export default function Ficha({ id, alVolver, alCambiar }) {
         ← Volver al rodeo
       </button>
 
-      {error && <div className="aviso error">{error}</div>}
+      {error && <div className="aviso error" role="alert">{error}</div>}
 
       <div className="panel">
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap' }}>
@@ -68,6 +82,10 @@ export default function Ficha({ id, alVolver, alCambiar }) {
               onClick={() => accion(() => api.cambiarEstado(animal.id, 'muerto'))}
             >
               Marcar muerto
+            </button>
+            {/* El aria-label nombra QUÉ se borra: "Borrar" solo no dice cuál. */}
+            <button className="btn sm danger" onClick={borrar} aria-label={`Borrar caravana ${animal.caravana}`}>
+              Borrar
             </button>
           </div>
         </div>
@@ -104,12 +122,12 @@ export default function Ficha({ id, alVolver, alCambiar }) {
 
         <div className="f2" style={{ marginTop: 14 }}>
           <div className="f">
-            <label>Fecha</label>
-            <input type="date" value={pesada.fecha} onChange={(e) => setPesada({ ...pesada, fecha: e.target.value })} />
+            <label htmlFor="pesada-fecha">Fecha</label>
+            <input id="pesada-fecha" type="date" value={pesada.fecha} onChange={(e) => setPesada({ ...pesada, fecha: e.target.value })} />
           </div>
           <div className="f">
-            <label>Kilos</label>
-            <input type="number" step="0.1" value={pesada.kg} onChange={(e) => setPesada({ ...pesada, kg: e.target.value })} placeholder="430" />
+            <label htmlFor="pesada-kg">Kilos</label>
+            <input id="pesada-kg" type="number" step="0.1" value={pesada.kg} onChange={(e) => setPesada({ ...pesada, kg: e.target.value })} placeholder="430" />
           </div>
         </div>
         <button
@@ -143,12 +161,12 @@ export default function Ficha({ id, alVolver, alCambiar }) {
 
         <div className="f2" style={{ marginTop: 14 }}>
           <div className="f">
-            <label>Fecha del parto</label>
-            <input type="date" value={parto.fecha} onChange={(e) => setParto({ ...parto, fecha: e.target.value })} />
+            <label htmlFor="parto-fecha">Fecha del parto</label>
+            <input id="parto-fecha" type="date" value={parto.fecha} onChange={(e) => setParto({ ...parto, fecha: e.target.value })} />
           </div>
           <div className="f">
-            <label>Caravana de la cría</label>
-            <input value={parto.cria_caravana} onChange={(e) => setParto({ ...parto, cria_caravana: e.target.value })} placeholder="0231" />
+            <label htmlFor="parto-cria">Caravana de la cría</label>
+            <input id="parto-cria" value={parto.cria_caravana} onChange={(e) => setParto({ ...parto, cria_caravana: e.target.value })} placeholder="0231" />
           </div>
         </div>
         <button

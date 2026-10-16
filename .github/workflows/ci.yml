@@ -198,6 +198,13 @@ jobs:
     timeout-minutes: 20
     permissions:
       contents: read
+    # TP7: las URLs de QA viven en las variables del environment qa (las del TP6),
+    # y un job sólo las lee si declara ese environment. Los jobs de prueba no lo
+    # declaran (no despliegan nada), así que deploy-qa se las pasa como salidas:
+    # una sola fuente de verdad, nada escrito dos veces.
+    outputs:
+      url_api: ${{ steps.urls.outputs.api }}
+      url_front: ${{ steps.urls.outputs.front }}
     steps:
       # TP7: el hook deja de decir QUÉ COMMIT CONSTRUIR y pasa a decir QUÉ IMAGEN
       # EJECUTAR. Los servicios de Render son "Existing Image": no compilan nada,
@@ -236,11 +243,114 @@ jobs:
           COMMIT: ${{ github.sha }}
         run: .github/scripts/smoke.sh
 
+      - name: Pasarle las URLs de QA a los jobs de prueba
+        id: urls
+        env:
+          URL_API: ${{ vars.URL_API }}
+          URL_FRONT: ${{ vars.URL_FRONT }}
+        run: |
+          echo "api=$URL_API" >> "$GITHUB_OUTPUT"
+          echo "front=$URL_FRONT" >> "$GITHUB_OUTPUT"
+
+  # ── TP7: las pruebas contra QA, como gate de promoción ─────────────────────────
+  # Corren contra QA, que a esta altura ya ejecuta la IMAGEN de esta corrida (el
+  # smoke de deploy-qa lo comprobó con el commit de /health). En orden de costo:
+  # primero la integración (pedidos HTTP, segundos, sin navegador); si la api o la
+  # base están rotas, la e2e ni arranca. Después la e2e (un Chromium, minutos).
+  #
+  # 🔴 El gate tiene que poder decir que no: en este tramo no hay continue-on-error,
+  # ni "|| true", ni if: always(). Los únicos !cancelled() son los de los pasos que
+  # PUBLICAN el reporte, que importa más cuando algo falló.
+  # En un PR, deploy-qa no corre, y por eso estos dos jobs (y deploy-prod) salen
+  # salteados: un job cuya dependencia se salteó, se saltea.
+  integracion:
+    runs-on: ubuntu-latest
+    needs: deploy-qa                           # QA ya ejecuta la imagen de ESTA corrida
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - name: Bajar el código al runner
+        uses: actions/checkout@v4
+
+      - name: Preparar Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Instalar dependencias (sin navegador)
+        run: npm ci                            # sin "playwright install": estas pruebas no abren navegador
+        working-directory: ./frontend
+
+      - name: Integración contra la api de QA
+        env:
+          API_BASE_URL: ${{ needs.deploy-qa.outputs.url_api }}   # la API, no el front
+        run: npx playwright test e2e/api.spec.js
+        working-directory: ./frontend
+
+      - name: Resumen de la integración
+        if: ${{ !cancelled() }}
+        run: node .github/scripts/resumen-playwright.js "Integración contra la api de QA" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Publicar el reporte de integración
+        uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: playwright-report-integracion  # distinto del de e2e: dos con el mismo nombre rompen la corrida
+          path: frontend/playwright-report
+          retention-days: 7
+
+  e2e:
+    runs-on: ubuntu-latest
+    # El gate del medio: sin integración verde no se gasta un navegador en
+    # confirmar que la api está rota. deploy-qa figura sólo para leer sus salidas
+    # (la URL del front de QA): integracion ya depende de él.
+    needs: [deploy-qa, integracion]
+    timeout-minutes: 20                        # si algo se cuelga, el job muere en vez de esperar horas
+    permissions:
+      contents: read
+    steps:
+      - name: Bajar el código al runner
+        uses: actions/checkout@v4
+
+      - name: Preparar Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Instalar dependencias y el navegador
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+        working-directory: ./frontend
+
+      - name: e2e contra el front de QA
+        env:
+          E2E_BASE_URL: ${{ needs.deploy-qa.outputs.url_front }}   # el FRONT de QA
+        run: npx playwright test e2e/animales.spec.js   # SU archivo: sin esto vuelve a correr la integración
+        working-directory: ./frontend
+
+      - name: Resumen de las e2e
+        if: ${{ !cancelled() }}
+        run: node .github/scripts/resumen-playwright.js "e2e contra el front de QA" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Publicar el reporte e2e
+        uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}                # también (sobre todo) cuando falla: trae captura y traza
+        with:
+          name: playwright-report-e2e
+          path: frontend/playwright-report
+          retention-days: 7
+
   deploy-prod:
     runs-on: ubuntu-latest
-    needs: deploy-qa                           # PROD sólo después de QA desplegado y con smoke verde
-    # No repite el if de la rama y no es un olvido: depende de deploy-qa, que sí
-    # lo tiene. En un PR ninguno de los dos corre: la condición viaja por la cadena.
+    needs: e2e                                 # TP7: EL gate. Sin integración y e2e verdes, ni se pide aprobación
+    # No repite el if de la rama y no es un olvido: la cadena arranca en deploy-qa,
+    # que sí lo tiene. En un PR nada de esto corre: la condición viaja por los needs.
     environment: production                    # ⏸ acá la corrida SE PAUSA hasta que el reviewer apruebe
     concurrency:
       group: deploy-prod                       # dos deploys a PROD nunca a la vez

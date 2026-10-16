@@ -30,6 +30,7 @@ export function crearApi(unFetch) {
     listarAnimales: (q = '') => pedir(`/animales?q=${encodeURIComponent(q)}`),
     verAnimal: (id) => pedir(`/animales/${id}`),
     crearAnimal: (datos) => pedir('/animales', { method: 'POST', body: JSON.stringify(datos) }),
+    borrarAnimal: (id) => pedir(`/animales/${id}`, { method: 'DELETE' }),
     cambiarEstado: (id, estado) =>
       pedir(`/animales/${id}/estado`, { method: 'PATCH', body: JSON.stringify({ estado }) }),
     agregarPesada: (id, datos) =>

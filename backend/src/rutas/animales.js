@@ -10,6 +10,8 @@ const servicio = crearServicio(repositorio);
 export const animales = Router();
 
 function responder(res, { status, cuerpo }) {
+  // 204 = "hecho, no hay nada que devolver": sin cuerpo, ni siquiera un null.
+  if (status === 204) return res.status(204).end();
   res.status(status).json(cuerpo);
 }
 
@@ -26,6 +28,11 @@ animales.get('/:id', async (req, res) => {
 // POST /api/animales — alta (regla 2).
 animales.post('/', async (req, res) => {
   responder(res, await servicio.alta(req.body));
+});
+
+// DELETE /api/animales/:id: baja de un animal cargado por error (TP7).
+animales.delete('/:id', async (req, res) => {
+  responder(res, await servicio.borrar(req.params.id));
 });
 
 // PATCH /api/animales/:id/estado — cambio de estado (regla 5).

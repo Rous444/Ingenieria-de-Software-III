@@ -1,4 +1,5 @@
 import { defineConfig } from 'vite';
+import { configDefaults } from 'vitest/config';
 import react from '@vitejs/plugin-react';
 
 // Mismo motivo que en el backend: las fechas sin hora se leen en UTC. Los tests
@@ -17,6 +18,9 @@ export default defineConfig({
   },
   // TP5: tests unitarios de la lógica del front (sin DOM) y su cobertura.
   test: {
+    // TP7: los specs de Playwright viven en e2e/ y son de OTRO runner. Sin esto,
+    // vitest los toma (matchea *.spec.js) y rompe build-frontend.
+    exclude: [...configDefaults.exclude, 'e2e/**'],
     coverage: {
       provider: 'v8',
       // json-summary deja coverage-summary.json: lo lee el pipeline para el Summary.

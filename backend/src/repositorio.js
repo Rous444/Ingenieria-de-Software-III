@@ -50,6 +50,13 @@ export const repositorio = {
     return rows[0];
   },
 
+  // TP7: borra el animal y, por el ON DELETE CASCADE de db.js, sus pesadas y
+  // partos. Devuelve true si había un animal con ese id.
+  async borrarAnimal(id) {
+    const { rowCount } = await pool.query('DELETE FROM animal WHERE id = $1', [id]);
+    return rowCount > 0;
+  },
+
   async insertarPesada(animalId, { fecha, kg }) {
     const { rows } = await pool.query(
       'INSERT INTO pesada (animal_id, fecha, kg) VALUES ($1, $2, $3) RETURNING *',
