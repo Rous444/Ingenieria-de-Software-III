@@ -29,6 +29,13 @@ COPY package*.json ./
 RUN npm ci --omit=dev
 COPY src ./src
 
+# TP7: el commit del que salió esta imagen, horneado adentro. Lo pasa el pipeline
+# (build-args en ci.yml) y la api lo devuelve en /health. Va al final de la etapa
+# para no invalidar la caché de las capas de arriba, que no cambian con el commit.
+# Construida a mano, sin el argumento, queda vacío: /health dice 'desconocida'.
+ARG GIT_SHA=
+ENV GIT_SHA=$GIT_SHA
+
 # Node corre como root por defecto; la imagen trae un usuario sin privilegios.
 USER node
 
