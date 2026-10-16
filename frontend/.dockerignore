@@ -2,3 +2,6 @@ node_modules/
 dist/
 .git/
 coverage/
+playwright-report/
+test-results/
+resultados-playwright.json

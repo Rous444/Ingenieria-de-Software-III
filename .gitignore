@@ -16,3 +16,7 @@ Thumbs.db
 .idea/
 # reportes de cobertura (TP5): los genera cada corrida, no se versionan
 coverage/
+# reportes de Playwright (TP7): los genera cada corrida, no se versionan
+playwright-report/
+test-results/
+resultados-playwright.json
