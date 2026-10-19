@@ -40,4 +40,5 @@ ENV GIT_SHA=$GIT_SHA
 USER node
 
 EXPOSE 8080
-CMD ["node", "src/index.js"]
+# TP9: --import carga Sentry antes que la app, para que pueda medir Express y pg.
+CMD ["node", "--import", "./src/instrument.js", "src/index.js"]

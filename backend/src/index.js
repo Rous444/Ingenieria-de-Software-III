@@ -1,3 +1,4 @@
+import * as Sentry from '@sentry/node';
 import express from 'express';
 import { init, pool } from './db.js';
 import { animales } from './rutas/animales.js';
@@ -27,6 +28,15 @@ app.get('/health', async (_req, res) => {
 });
 
 app.use('/api/animales', animales);
+
+// TP9, TEMPORAL: un endpoint que falla a propósito, para ver un error llegar a
+// Sentry desde producción. Se saca al cerrar el práctico.
+app.get('/api/falla', () => {
+  throw new Error('Falla de prueba del TP9');
+});
+
+// TP9: Sentry recibe cada error que llega hasta acá, antes que nuestro manejador.
+Sentry.setupExpressErrorHandler(app);
 
 // Cualquier error no capturado en una ruta termina acá, como JSON y no como un
 // stack trace en el navegador.
