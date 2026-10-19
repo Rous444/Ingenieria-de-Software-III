@@ -25,7 +25,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Preparar el constructor que sabe cachear
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
 
       # ── TP5: tests con cobertura, en la etapa `test` del mismo Dockerfile ──
       - name: Construir la etapa de tests del backend
@@ -118,7 +118,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Preparar el constructor que sabe cachear
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
 
       # ── TP5: tests con cobertura, en la etapa `test` del mismo Dockerfile ──
       - name: Construir la etapa de tests del frontend
