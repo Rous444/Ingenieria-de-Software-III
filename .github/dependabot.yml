@@ -1,0 +1,22 @@
+# TP9: Dependabot vigila las dependencias de los tres lugares donde las tengo.
+# Cada semana abre un PR por cada versión nueva; si se publica una falla de
+# seguridad en alguna, abre el PR que la arregla sin esperar al lunes (eso lo
+# prende "Dependabot security updates" en Settings → Advanced Security).
+# Cada PR pasa por el mismo pipeline que cualquier cambio: tests, cobertura,
+# deploy a QA, integración y e2e. Ese verde es lo que me deja mergearlo.
+version: 2
+updates:
+  - package-ecosystem: "npm" # el backend (Express, pg, vitest)
+    directory: "/backend"
+    schedule:
+      interval: "weekly"
+
+  - package-ecosystem: "npm" # el frontend (React, Vite, vitest, Playwright)
+    directory: "/frontend"
+    schedule:
+      interval: "weekly"
+
+  - package-ecosystem: "github-actions" # las actions del workflow también son código de terceros
+    directory: "/"
+    schedule:
+      interval: "weekly"
