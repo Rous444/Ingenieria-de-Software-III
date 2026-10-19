@@ -19,6 +19,7 @@ export default defineConfig({
       include: ['src/**/*.js'],
       exclude: [
         'src/index.js', //        el arranque: crea Express, monta rutas, escucha el puerto
+        'src/instrument.js', //   el arranque de Sentry (TP9): configuración, sin reglas
         'src/db.js', //           la conexión y el CREATE TABLE: infraestructura, sin reglas
         'src/repositorio.js', //  SQL puro contra PostgreSQL: se verifica con la base de verdad (TP7)
         'src/rutas/**', //        pegamento HTTP: pide, delega en el servicio y responde
