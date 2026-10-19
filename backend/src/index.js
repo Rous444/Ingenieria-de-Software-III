@@ -29,12 +29,6 @@ app.get('/health', async (_req, res) => {
 
 app.use('/api/animales', animales);
 
-// TP9, TEMPORAL: un endpoint que falla a propósito, para ver un error llegar a
-// Sentry desde producción. Se saca al cerrar el práctico.
-app.get('/api/falla', () => {
-  throw new Error('Falla de prueba del TP9');
-});
-
 // TP9: Sentry recibe cada error que llega hasta acá, antes que nuestro manejador.
 Sentry.setupExpressErrorHandler(app);
 
