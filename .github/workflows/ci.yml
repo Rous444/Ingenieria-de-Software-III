@@ -29,7 +29,7 @@ jobs:
 
       # ── TP5: tests con cobertura, en la etapa `test` del mismo Dockerfile ──
       - name: Construir la etapa de tests del backend
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: ./backend
           target: test          # se detiene en la etapa de tests, no llega a la final
@@ -88,7 +88,7 @@ jobs:
       # El nombre va a mano y en minúsculas: ghcr.io no acepta mayúsculas y
       # github.repository es "Rous444/Ingenieria-de-Software-III".
       - name: Construir y publicar la imagen del backend
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: ./backend
           push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
@@ -122,7 +122,7 @@ jobs:
 
       # ── TP5: tests con cobertura, en la etapa `test` del mismo Dockerfile ──
       - name: Construir la etapa de tests del frontend
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: ./frontend
           target: test          # se detiene en la etapa de tests, no llega a la final
@@ -181,7 +181,7 @@ jobs:
       # El nombre va a mano y en minúsculas: ghcr.io no acepta mayúsculas y
       # github.repository es "Rous444/Ingenieria-de-Software-III".
       - name: Construir y publicar la imagen del frontend
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: ./frontend
           push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
