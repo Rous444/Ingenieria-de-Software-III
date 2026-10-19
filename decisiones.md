@@ -1110,3 +1110,61 @@ Preprod es un **tercer entorno**, escrito en `infra/` y creado desde cero con `t
 ### Declaración de uso de IA
 
 Usé Claude para escribir el HCL de `infra/` (providers fijados, recursos, la cadena de conexión y la URL derivadas, outputs), el `.gitignore` y esta sección, y para diagnosticar los problemas de arriba. Lo verifiqué contra lo que pasó: `validate` en verde; el plan leído antes de aplicar (`5 to add`, qué es cada recurso y por qué tantos valores dicen `known after apply`); el `apply` creando en orden proyecto, rol, base, api y front; `/health` con la base `ok` y el commit de v7.0.0, `/api/animales` devolviendo `[]` contra la base nueva y el front con "API conectada"; el segundo `plan` sin cambios; el `destroy` recorriendo el grafo al revés; y QA y producción intactos en las dos consolas. Puedo leer un plan en voz alta y decir qué haría cada acción.
+
+## TP9 · DevSecOps + observabilidad
+
+Las tres protecciones automáticas de GitHub quedaron activas en el repo (Dependabot con sus alertas y actualizaciones de seguridad, CodeQL con la configuración por defecto, y push protection), producción tiene un monitor externo en UptimeRobot, y la api y el front de producción le cuentan a Sentry qué falla, qué tarda y qué se usa.
+
+### El PR de Dependabot que mergeé, y por qué me animé
+
+`.github/dependabot.yml` vigila tres ecosistemas: npm del backend, npm del frontend y las GitHub Actions (PR #51). A los minutos del merge abrió una tanda de PRs, y el pipeline los separó solo:
+
+- **En rojo, todos los saltos de versión mayor**: vite 5 → 8, vitest 3 → 5 (back y front), @vitest/coverage-v8 3 → 5, react-dom 18 → 19, @vitejs/plugin-react 4 → 6. Un major puede romper la API, y la build o los tests lo confirmaron sin que nadie tuviera que leer un changelog. No los mergeé: cada uno es una migración que se planifica, no un clic.
+- **En verde, `pg` 8.23.0 → 8.23.1** (https://github.com/Rous444/Ingenieria-de-Software-III/pull/61). Es un **patch** de SemVer: arreglos, sin cambios de API. Lo mergeé porque el verde de ese PR no es "compiló": es el semestre entero diciendo que sí. Los unitarios del back con su umbral de cobertura (TP5), y después del merge la cadena completa (https://github.com/Rous444/Ingenieria-de-Software-III/actions/runs/39270065369): deploy a QA de la imagen nueva, el smoke, **la integración contra el Postgres de verdad** (la capa que justamente usa `pg`, TP7) y la e2e, antes de la aprobación a PROD.
+
+Las alertas de Dependabot marcaban 17 vulnerabilidades (5 críticas) al prenderlas, y las actualizaciones de seguridad abrieron solas los PRs #44 a #50. Los paquetes que tocan esos PRs son vite, esbuild, vitest, tinypool y source-map-js: herramientas de desarrollo y de tests, que **no entran a las imágenes de producción**: la del back instala con `npm ci --omit=dev` y la del front sólo lleva el `dist/` servido por nginx. No es excusa para dejarlas (vite corre en la máquina de quien desarrolla), pero ordena la prioridad.
+
+### El monitor: cuánto tardó en avisarme
+
+Monitor HTTP(s) de UptimeRobot sobre `https://rodeo-api-prod.onrender.com/health`, cada 5 minutos, con aviso por email. Antes de crearlo comprobé con `curl -I` que el endpoint contesta **HEAD** con 200 (el plan gratis pregunta con HEAD; Express lo contesta solo para cualquier ruta GET).
+
+La caída provocada, el 19/10:
+
+| | Hora |
+|---|---|
+| Suspendí `Rodeo-api-prod` en Render | 14:07 |
+| Mail **DOWN** | 14:10 |
+| Reanudé el servicio | 14:14 |
+| Mail **UP** | 14:15 |
+
+**Tres minutos** desde la caída hasta el aviso (el intervalo es de 5: depende de en qué parte del ciclo cae). Sin el monitor me habría enterado cuando un usuario escribiera, que en el escenario del TP fueron cuarenta minutos un sábado. El UP llegó rápido porque abrí `/health` en el navegador para despertar el servicio.
+
+Al terminar **pausé el monitor**: uno que le pega a PROD cada 5 minutos la mantiene despierta todo el mes y se come las 750 horas que comparten todos mis servicios gratuitos; si se acaban, Render suspende también producción.
+
+### Sentry: mi operación más usada y la más lenta
+
+Dos proyectos de Sentry, uno por lado. En el back, `@sentry/node` se carga con `node --import ./src/instrument.js` antes que la app, para medir Express y `pg` desde adentro; el DSN entra por la variable `SENTRY_DSN`, cargada **sólo** en el servicio de producción (sin ella la librería queda apagada: local, tests, QA y preprod). En el front, `@sentry/react` con el DSN escrito en `main.jsx`: no es un secreto, sólo sirve para **enviar** datos al proyecto (no para leerlos) y viaja igual en el JavaScript que baja cualquier navegador. Para ver un error llegar subí un `/api/falla` temporal (PR #66), lo llamé desde producción y apareció en *Issues* como "Error: Falla de prueba del TP9", sin manejar, con la ruta. En este PR se saca.
+
+Lo que midió en producción, después de usarla unos minutos:
+
+| Operación | P95 | Pedidos |
+|---|---|---|
+| `GET /api/animales` (la lista y la búsqueda) | 201 ms | ~6, **la más usada** |
+| `POST /api/animales` (el alta) | 1,38 s | ~3 |
+| `GET /api/animales/:id` (la ficha) | **1,44 s, la más lenta** | ~2 |
+| `PATCH /api/animales/:id/estado` | 367 ms | 1 |
+
+La más usada es la lista: se pide al abrir la app y con cada búsqueda. La más lenta es la ficha, y Sentry dice por qué: la consulta en sí tarda 176 ms, el resto es **abrir la conexión a Neon** (`connect` 1,08 s, `pg-connect` 529 ms), que se suspende sin uso y el primer pedido paga el arranque. Con ese dato abrí la tarjeta https://github.com/Rous444/Ingenieria-de-Software-III/issues/67 en el tablero del TP3, con el número adentro y un criterio de hecho (P95 de la ficha por debajo de 500 ms, medido en Sentry).
+
+**Lo que el monitor no ve y Sentry sí**: el monitor sólo sabe si `/health` contesta. Sentry ve el error de una ruta que el monitor nunca pregunta, y que la ficha tarda 1,4 s aunque todo "esté arriba".
+
+### Problemas y cómo los resolví
+
+- **El primer DSN del front era de otro proyecto.** El número final de un DSN es el id del proyecto, y no coincidía con el del proyecto React (probablemente uno creado y borrado en el onboarding). Lo copié de nuevo desde *Client Keys (DSN)* del proyecto correcto antes de mergear.
+- **Cargar `SENTRY_DSN` sin tirar PROD para atrás.** En un servicio de imagen, "Save and deploy" despliega la imagen configurada en *Settings* (la del primer merge del TP7), no la que está corriendo. La guardé con **"Save only"** y la tomó el deploy del pipeline del PR #66.
+- **Los majors de Dependabot en rojo**: no es un problema a resolver ahora, es el pipeline haciendo su trabajo. Quedan abiertos como deuda visible.
+- **El proyecto del back quedó con el nombre `rodei`** (typo). No afecta nada: el DSN es lo que importa.
+
+### Declaración de uso de IA
+
+Usé Claude para escribir el `dependabot.yml`, la integración de Sentry (el `instrument.js`, el `--import` del Dockerfile, el manejador de errores de Express y el `Sentry.init` del front), el endpoint de prueba, el texto de la tarjeta y esta sección, y para guiarme en las configuraciones de GitHub, Sentry, Render y UptimeRobot. Lo verifiqué así: antes de subirlo, levanté la api local contra un receptor falso de Sentry y vi llegar las transacciones y el evento del error, sin DSN la api arrancó igual, y `curl -I` a `/health` dio 200; los 58 unitarios del back, los 12 del front y las 6 pruebas de integración y e2e siguieron en verde. En la nube, contra lo que pasó: el PR de `pg` con su cadena hasta PROD, el error y la tabla de transacciones en Sentry, los mails de DOWN y UP con sus horas, y el monitor pausado.
